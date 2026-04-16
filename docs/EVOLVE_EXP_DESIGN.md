@@ -320,6 +320,65 @@ Each adapter produces records conforming to the standard JSONL schema (see Requi
 
 **SkyDiscover:** reads `checkpoints/checkpoint_N/` directories. AdaEvolve paradigm shift events are mapped to `framework_stagnation_event`.
 
+### 5.1.1 Relationship to CLEAR's Input Formats
+
+CLEAR's agentic pipeline accepts two input formats: raw JSON span traces from MLflow or Langfuse, and a preprocessed CSV intermediate representation. Both are built around the concept of *LLM calls within agent spans within trajectories* — the canonical fields are `model_input`, `response`, `tool_or_agent`, `meta_data`, `traj_score`.
+
+**These formats are not suitable as primary input for evolve-exp-analyzer.** The data model mismatch is fundamental:
+
+| Dimension | CLEAR agentic format | Evolve JSONL |
+|---|---|---|
+| Unit of analysis | LLM call within a span | Optimization iteration in a time series |
+| Order significance | Within-task ordering | Global ordering is the entire point |
+| Score semantics | `traj_score` = task success | `child_score`, `score_delta`, `parent_score` — the trajectory *is* the scores |
+| Code content | None | `parent_code`, `child_code`, `diff` |
+| Evaluator output | None | `evaluator_artifacts`, `cascade_stage_failed`, `evaluator_metrics` |
+| Compliance | None | `evolved_block_only`, `format_valid`, `signature_preserved` |
+| Framework source | LangGraph, CrewAI (via MLflow/Langfuse) | SkyDiscover, ShinkaEvolve, OpenEvolve (custom persistence) |
+
+The evolve frameworks do not use LangGraph or CrewAI, and do not natively emit MLflow or Langfuse traces. Forcing the evolve schema into CLEAR's `model_input`/`response`/`traj_score` fields would discard most of the evolution-specific data that the analyzer depends on.
+
+### 5.1.2 Observability Enrichment (Optional)
+
+A single evolve iteration contains two distinct information layers:
+
+1. **The LLM mutation call** — prompt, model response, token counts, latency, model name. This is a CLEAR-compatible concern. If a framework happens to be instrumented with Langfuse or MLflow (ShinkaEvolve uses LangChain internally, which supports Langfuse tracing), this metadata is available in spans.
+
+2. **The evolutionary event** — score delta, evaluator outcome, code diff, compliance flags. This is not observable through a span — it lives in the framework's own persistence (SQLite, checkpoint directories, trace JSONL).
+
+These are **complementary layers, not competing formats**. When a framework is instrumented, an optional enrichment adapter can extract LLM call metadata from spans and merge it into the evolve JSONL records:
+
+```
+Langfuse / MLflow span export (optional, when available)
+        │
+        ▼  enrich_from_spans(span_export_path, jsonl_records)
+        Extract per-iteration: llm_model, llm_tokens_used,
+                               llm_cost_usd, llm_latency_ms
+        Merge on iteration_id  →  into evolve JSONL record
+        │
+        ▼
+Evolve JSONL (primary format, now with richer LLM cost fields)
+```
+
+This enrichment is **additive**: the JSONL schema already has `llm_tokens_used`, `llm_cost_usd`, and `llm_model` fields marked "if available". The enrichment adapter populates them from spans when a span export exists. The analyzer's behavior is unchanged — these fields feed the Efficiency analyzer and the cost cap logic; they are optional throughout.
+
+The enrichment adapter signature:
+
+```python
+def enrich_from_spans(
+    records: List[dict],
+    span_export_path: str,
+    observability_platform: str,   # "mlflow" | "langfuse"
+) -> List[dict]:
+    """
+    Reads span export, matches spans to iterations by timestamp or
+    iteration_id attribute, and populates llm_* cost fields in-place.
+    Records with no matching span are returned unchanged.
+    """
+```
+
+**This is not a format bridge.** It does not make evolve-exp-analyzer consume CLEAR's formats. It makes the ingestion layer opportunistically richer when observability data happens to exist alongside the framework's native output.
+
 ---
 
 ### 5.2 Quantitative Analyzer (`quantitative/`)
