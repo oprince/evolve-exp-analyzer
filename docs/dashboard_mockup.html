@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EvoExp Analyzer — circle_packing_v3</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f8f9fa;color:#202124;display:flex;height:100vh;overflow:hidden}
+
+/* Sidebar */
+#sidebar{width:220px;min-width:220px;background:#fff;border-right:1px solid #e0e0e0;display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+#sidebar .logo{padding:18px 16px 14px;border-bottom:1px solid #e0e0e0}
+#sidebar .logo .app-name{font-size:13px;font-weight:700;color:#1a73e8;letter-spacing:.5px;text-transform:uppercase}
+#sidebar .logo .exp-name{font-size:11px;color:#5f6368;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sidebar nav{flex:1;padding:8px 0}
+#sidebar nav a{display:flex;align-items:center;gap:10px;padding:9px 16px;font-size:13px;color:#5f6368;text-decoration:none;cursor:pointer;border-left:3px solid transparent;transition:all .15s}
+#sidebar nav a:hover{background:#f1f3f4;color:#202124}
+#sidebar nav a.active{background:#e8f0fe;color:#1a73e8;border-left-color:#1a73e8;font-weight:600}
+#sidebar nav .section-label{font-size:10px;font-weight:600;color:#9aa0a6;text-transform:uppercase;letter-spacing:.8px;padding:16px 16px 4px}
+#sidebar .sidebar-footer{padding:12px 16px;border-top:1px solid #e0e0e0;font-size:11px;color:#9aa0a6}
+
+/* Main */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#header{height:56px;background:#fff;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;padding:0 24px;gap:16px;flex-shrink:0}
+#header .page-title{font-size:16px;font-weight:600;color:#202124}
+#header .breadcrumb{font-size:12px;color:#9aa0a6}
+#header .spacer{flex:1}
+#header .run-badge{background:#e6f4ea;color:#137333;font-size:11px;font-weight:600;padding:4px 10px;border-radius:12px;border:1px solid #ceead6}
+#content{flex:1;overflow-y:auto;padding:24px}
+
+/* Panels */
+.panel{display:none}
+.panel.active{display:block}
+
+/* Cards */
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+.stat-card{background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:16px 20px}
+.stat-card .label{font-size:11px;color:#5f6368;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.stat-card .value{font-size:26px;font-weight:700;color:#202124}
+.stat-card .sub{font-size:11px;color:#9aa0a6;margin-top:4px}
+
+.meta-strip{background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:12px 20px;display:flex;gap:32px;margin-bottom:20px;flex-wrap:wrap}
+.meta-strip .meta-item .mk{font-size:10px;color:#9aa0a6;text-transform:uppercase;letter-spacing:.5px}
+.meta-strip .meta-item .mv{font-size:13px;font-weight:600;color:#202124;margin-top:2px}
+
+.exec-box{background:#e8f0fe;border:1px solid #c5d8f7;border-radius:8px;padding:16px 20px;margin-bottom:20px}
+.exec-box h3{font-size:13px;font-weight:700;color:#1a73e8;margin-bottom:8px}
+.exec-box p{font-size:13px;color:#202124;line-height:1.6;margin-bottom:8px}
+.exec-box p:last-child{margin-bottom:0}
+
+.section-title{font-size:14px;font-weight:700;color:#202124;margin-bottom:12px}
+.section-sub{font-size:12px;color:#5f6368;margin-bottom:16px;margin-top:-8px}
+
+/* Dimension table */
+.dim-table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e0e0e0}
+.dim-table th{background:#f8f9fa;font-size:11px;font-weight:700;color:#5f6368;text-transform:uppercase;letter-spacing:.5px;padding:10px 14px;text-align:left;border-bottom:1px solid #e0e0e0}
+.dim-table td{padding:10px 14px;font-size:13px;border-bottom:1px solid #f1f3f4;vertical-align:middle}
+.dim-table tr:last-child td{border-bottom:none}
+.dim-table tr:hover td{background:#f8f9fa}
+.stars{color:#f9ab00;letter-spacing:1px;font-size:14px}
+.stars .empty{color:#e0e0e0}
+.rec-btn{background:#1a73e8;color:#fff;border:none;border-radius:4px;font-size:11px;padding:3px 10px;cursor:pointer;white-space:nowrap}
+.rec-btn:hover{background:#1557b0}
+.badge-crit{background:#fce8e6;color:#c5221f;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;border:1px solid #f4b8b3;text-transform:uppercase}
+.badge-warn{background:#fef7e0;color:#b06000;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;border:1px solid #fdd663;text-transform:uppercase}
+.badge-ok{background:#e6f4ea;color:#137333;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;border:1px solid #81c995;text-transform:uppercase}
+.badge-info{background:#e8f0fe;color:#1a55c0;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;border:1px solid #a8c5fa;text-transform:uppercase}
+
+/* Chart container */
+.chart-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:20px;margin-bottom:20px;overflow-x:auto}
+.chart-wrap h3{font-size:13px;font-weight:700;color:#202124;margin-bottom:14px}
+
+/* Pills */
+.pill-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px}
+.pill{background:#f1f3f4;border-radius:20px;padding:6px 14px;font-size:12px;color:#5f6368;border:1px solid #e0e0e0}
+.pill strong{color:#202124}
+
+/* Alert cards */
+.alert-card{background:#fff;border:1px solid #e0e0e0;border-radius:8px;margin-bottom:16px;overflow:hidden}
+.alert-header{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer;user-select:none}
+.alert-header:hover{background:#f8f9fa}
+.alert-title{font-size:14px;font-weight:600;flex:1}
+.alert-body{padding:0 18px 16px;border-top:1px solid #f1f3f4;display:none}
+.alert-body.open{display:block}
+.expand-btn{font-size:11px;color:#1a73e8;cursor:pointer;white-space:nowrap}
+
+.seq-table{width:100%;border-collapse:collapse;font-size:12px;margin:12px 0}
+.seq-table th{background:#f8f9fa;padding:6px 10px;text-align:left;color:#5f6368;border-bottom:1px solid #e0e0e0;font-weight:600}
+.seq-table td{padding:6px 10px;border-bottom:1px solid #f1f3f4}
+
+.root-cause-badge{display:inline-block;background:#fff3e0;color:#e65100;border:1px solid #ffcc80;border-radius:4px;padding:3px 10px;font-size:11px;font-weight:700;letter-spacing:.5px;margin:10px 0}
+.llm-block{background:#f8f9fa;border-left:3px solid #dadce0;border-radius:0 4px 4px 0;padding:12px 14px;font-size:12px;color:#3c4043;line-height:1.6;margin:10px 0}
+.rec-box{border:1.5px solid #1a73e8;border-radius:6px;padding:10px 14px;font-size:12px;color:#202124;line-height:1.6;margin:10px 0}
+.rec-box strong{color:#1a73e8}
+
+/* Observations */
+.obs-section{background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:16px 18px;margin-top:8px}
+.obs-section h4{font-size:12px;font-weight:700;color:#5f6368;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.obs-section ul{padding-left:18px}
+.obs-section li{font-size:13px;color:#3c4043;margin-bottom:6px;line-height:1.5}
+
+/* Legend */
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:#5f6368}
+.legend-item{display:flex;align-items:center;gap:6px}
+.legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.legend-line{width:24px;height:3px;flex-shrink:0}
+.legend-dash{width:24px;height:2px;border-top:2px dashed #9aa0a6;flex-shrink:0}
+
+/* Failure budget */
+.budget-bar-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:20px;margin-bottom:20px}
+.stacked-bar{display:flex;height:40px;border-radius:6px;overflow:hidden;margin-bottom:12px}
+.stacked-bar .seg{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;transition:opacity .2s}
+.stacked-bar .seg:hover{opacity:.85}
+.budget-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px}
+.budget-legend-item{display:flex;align-items:center;gap:6px;font-size:12px}
+.color-sq{width:12px;height:12px;border-radius:2px;flex-shrink:0}
+
+.data-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
+.data-table th{background:#f8f9fa;padding:8px 12px;text-align:left;color:#5f6368;border-bottom:1px solid #e0e0e0;font-weight:600}
+.data-table td{padding:8px 12px;border-bottom:1px solid #f1f3f4}
+
+/* Mutation effectiveness */
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px}
+.panel-card{background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:16px 18px}
+.panel-card h4{font-size:12px;font-weight:700;color:#5f6368;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px}
+
+/* Heat cells */
+.heat-green{background:#e6f4ea;color:#137333}
+.heat-yellow{background:#fef7e0;color:#8a6400}
+.heat-red{background:#fce8e6;color:#c5221f}
+.heat-neutral{background:#f8f9fa;color:#5f6368}
+
+/* Artifact pattern cards */
+.artifact-card{background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:16px 18px;margin-bottom:12px}
+.artifact-header{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.artifact-freq-bar{height:8px;border-radius:4px;background:#1a73e8;margin-bottom:4px}
+.freq-label{font-size:11px;color:#9aa0a6}
+.count-badge{background:#e8f0fe;color:#1a55c0;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px}
+
+/* Efficiency panels */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.metric-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+.metric-card{background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:14px 16px}
+.metric-card .m-label{font-size:11px;color:#5f6368;margin-bottom:4px}
+.metric-card .m-val{font-size:18px;font-weight:700;color:#202124}
+.metric-card .m-sub{font-size:10px;color:#9aa0a6;margin-top:3px}
+
+/* In-flight status bar */
+.status-bar{background:#137333;color:#fff;padding:10px 20px;border-radius:8px;display:flex;align-items:center;gap:14px;margin-bottom:20px;font-size:13px;flex-wrap:wrap}
+.status-bar .pulse{width:10px;height:10px;border-radius:50%;background:#81c995;animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
+.status-bar .sb-item{display:flex;flex-direction:column}
+.status-bar .sb-label{font-size:9px;opacity:.7;text-transform:uppercase;letter-spacing:.5px}
+.status-bar .sb-val{font-size:13px;font-weight:700}
+
+.alert-feed{background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:0;overflow:hidden}
+.alert-feed-header{background:#f8f9fa;padding:10px 14px;font-size:11px;font-weight:700;color:#5f6368;text-transform:uppercase;border-bottom:1px solid #e0e0e0}
+.alert-entry{padding:10px 14px;border-bottom:1px solid #f1f3f4;font-size:12px}
+.alert-entry:last-child{border-bottom:none}
+.alert-time{color:#9aa0a6;font-size:10px;margin-bottom:3px}
+.alert-msg{color:#202124;line-height:1.4}
+.spinner{display:inline-block;width:10px;height:10px;border:2px solid #e0e0e0;border-top-color:#1a73e8;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-left:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.inflight-layout{display:grid;grid-template-columns:1fr 320px;gap:20px}
+
+.insight-box{background:#e8f0fe;border-left:4px solid #1a73e8;border-radius:0 6px 6px 0;padding:12px 16px;font-size:13px;color:#202124;line-height:1.6;margin-top:14px}
+.insight-box strong{color:#1a73e8}
+
+.italic-gray{color:#9aa0a6;font-style:italic;font-size:12px}
+
+/* Cross table */
+.cross-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+.cross-table th,.cross-table td{padding:8px 12px;border:1px solid #e0e0e0;text-align:center}
+.cross-table th{background:#f8f9fa;font-weight:600;color:#5f6368}
+.cross-table .row-head{text-align:left;font-weight:600;background:#f8f9fa}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="logo">
+    <div class="app-name">EvoExp Analyzer</div>
+    <div class="exp-name">circle_packing_v3</div>
+  </div>
+  <nav>
+    <div class="section-label">Post-mortem</div>
+    <a class="nav-link active" data-panel="panel-overview">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Overview
+    </a>
+    <a class="nav-link" data-panel="panel-score">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Score Progression
+    </a>
+    <a class="nav-link" data-panel="panel-alerts">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Alert Panel
+    </a>
+    <a class="nav-link" data-panel="panel-budget">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Failure Budget
+    </a>
+    <a class="nav-link" data-panel="panel-mutation">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
+      Mutation Effectiveness
+    </a>
+    <a class="nav-link" data-panel="panel-compliance">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Compliance × Score
+    </a>
+    <a class="nav-link" data-panel="panel-cascade">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+      Cascade Stages
+    </a>
+    <a class="nav-link" data-panel="panel-artifacts">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Evaluator Artifacts
+    </a>
+    <a class="nav-link" data-panel="panel-efficiency">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Efficiency Curve
+    </a>
+    <a class="nav-link" data-panel="panel-explore">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+      Explore vs. Exploit
+    </a>
+    <div class="section-label">Live</div>
+    <a class="nav-link" data-panel="panel-inflight">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      In-flight Mode
+    </a>
+  </nav>
+  <div class="sidebar-footer">v0.4.1 · Post-mortem</div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <div id="header">
+    <div>
+      <div class="breadcrumb">EvoExp Analyzer</div>
+      <div class="page-title" id="page-title">Overview</div>
+    </div>
+    <div class="spacer"></div>
+    <span class="run-badge">Post-mortem · 51 iters</span>
+  </div>
+  <div id="content">
+
+    <!-- ===== PANEL 0: OVERVIEW ===== -->
+    <div id="panel-overview" class="panel active">
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="label">Iterations</div>
+          <div class="value">51</div>
+          <div class="sub">Completed</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Best Score</div>
+          <div class="value" style="color:#34a853">0.731</div>
+          <div class="sub">Achieved at iter 50</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Stagnation Periods</div>
+          <div class="value" style="color:#d93025">2</div>
+          <div class="sub">14 + 8 iters idle</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">LLM Cost</div>
+          <div class="value">$4.23</div>
+          <div class="sub">82% after plateau</div>
+        </div>
+      </div>
+
+      <div class="meta-strip">
+        <div class="meta-item"><div class="mk">Experiment</div><div class="mv">circle_packing_v3</div></div>
+        <div class="meta-item"><div class="mk">Tool</div><div class="mv">SkyDiscover</div></div>
+        <div class="meta-item"><div class="mk">Model</div><div class="mv">gpt-4o</div></div>
+        <div class="meta-item"><div class="mk">Mode</div><div class="mv">Post-mortem</div></div>
+        <div class="meta-item"><div class="mk">Run Date</div><div class="mv">2026-04-15</div></div>
+        <div class="meta-item"><div class="mk">Islands</div><div class="mv">3</div></div>
+      </div>
+
+      <div class="exec-box">
+        <h3>Executive Summary</h3>
+        <p>The circle_packing_v3 experiment achieved a best score of <strong>0.731</strong> over 51 iterations, representing a meaningful improvement over the baseline of 0.512. The evolutionary process demonstrated strong initial gains through iteration 11, where the best-so-far score rose from 0.512 to 0.694 — capturing 90% of the total improvement in just 22% of the compute budget. Two distinct stagnation periods (iters 11–24 and 38–45) consumed significant LLM cost without producing improvements, highlighting a structural inefficiency in the mutation strategy during exploitation phases.</p>
+        <p>The most critical finding is the absence of an automatic stagnation-detection mechanism. A simple streak counter triggering a strategy switch after 5 consecutive non-improving iterations would have reduced cost by an estimated <strong>$2.1</strong> and potentially achieved a higher final score. Instruction compliance was strong (62.7% fully compliant), and search-space utilization across the three islands was adequate, though Island 2 underperformed relative to its diversity budget. The evaluator showed systematic Stage 2 failures linked to an IndexError boundary condition, which artificially inflated the failure rate.</p>
+      </div>
+
+      <div class="section-title">Dimension Ratings</div>
+      <table class="dim-table">
+        <thead><tr><th>Dimension</th><th>Rating</th><th>Status</th><th>Summary</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Evolutionary Effectiveness</strong></td>
+            <td><span class="stars">●●●●<span class="empty">●</span></span></td>
+            <td><span class="badge-ok">GOOD</span></td>
+            <td style="font-size:12px;color:#5f6368">Score improved +0.219 vs baseline; 3 structural breakthroughs identified</td>
+            <td><button class="rec-btn">View</button></td>
+          </tr>
+          <tr>
+            <td><strong>Convergence Dynamics</strong></td>
+            <td><span class="stars">●●<span class="empty">●●●</span></span></td>
+            <td><span class="badge-warn">WARN</span></td>
+            <td style="font-size:12px;color:#5f6368">Fast initial rise followed by premature plateau; convergence stalled at 0.718</td>
+            <td><button class="rec-btn">View</button></td>
+          </tr>
+          <tr>
+            <td><strong>Exploration / Exploitation</strong></td>
+            <td><span class="stars">●●●<span class="empty">●●</span></span></td>
+            <td><span class="badge-warn">WARN</span></td>
+            <td style="font-size:12px;color:#5f6368">Balance adequate early but over-exploited during stagnation windows</td>
+            <td><button class="rec-btn">View</button></td>
+          </tr>
+          <tr>
+            <td><strong>Regression Analysis</strong></td>
+            <td><span class="stars">●●●<span class="empty">●●</span></span></td>
+            <td><span class="badge-warn">WARN</span></td>
+            <td style="font-size:12px;color:#5f6368">Score deltas tracked but no rollback logic triggered on regression clusters</td>
+            <td><button class="rec-btn">View</button></td>
+          </tr>
+          <tr style="background:#fff5f5">
+            <td><strong>Stagnation Detection</strong></td>
+            <td><span class="stars">●<span class="empty">●●●●</span></span></td>
+            <td><span class="badge-crit">CRITICAL</span></td>
+            <td style="font-size:12px;color:#d93025">No automated detection; 22 idle iters consumed $1.84 with zero gain</td>
+            <td><button class="rec-btn">View</button></td>
+          </tr>
+          <tr>
+            <td><strong>Efficiency</strong></td>
+            <td><span class="stars">●●<span class="empty">●●●</span></span></td>
+            <td><span class="badge-warn">WARN</span></td>
+            <td style="font-size:12px;color:#5f6368">$0.38 per improvement unit; 82% of compute spent after plateau onset</td>
+            <td><button class="rec-btn">View</button></td>
+          </tr>
+          <tr>
+            <td><strong>Generalization</strong></td>
+            <td><span class="stars">●●●<span class="empty">●●</span></span></td>
+            <td><span class="badge-warn">WARN</span></td>
+            <td style="font-size:12px;color:#5f6368">Best solution generalizes to 3/5 held-out test cases; overfits on dense inputs</td>
+            <td><button class="rec-btn">View</button></td>
+          </tr>
+          <tr>
+            <td><strong>Instruction Compliance</strong></td>
+            <td><span class="stars">●●●●<span class="empty">●</span></span></td>
+            <td><span class="badge-ok">GOOD</span></td>
+            <td style="font-size:12px;color:#5f6368">62.7% fully compliant; non-compliance strongly correlated with failure</td>
+            <td><button class="rec-btn">View</button></td>
+          </tr>
+          <tr>
+            <td><strong>Evaluator Output</strong></td>
+            <td><span class="stars">●●●<span class="empty">●●</span></span></td>
+            <td><span class="badge-warn">WARN</span></td>
+            <td style="font-size:12px;color:#5f6368">Stage 2 IndexError inflates failure rate; evaluator needs boundary guard</td>
+            <td><button class="rec-btn">View</button></td>
+          </tr>
+          <tr>
+            <td><strong>Search Space Utilization</strong></td>
+            <td><span class="stars">●●●●<span class="empty">●</span></span></td>
+            <td><span class="badge-ok">GOOD</span></td>
+            <td style="font-size:12px;color:#5f6368">5 structural families found; Island 1 led novel variant discovery</td>
+            <td><button class="rec-btn">View</button></td>
+          </tr>
+          <tr>
+            <td><strong>Meta-Analysis Quality</strong></td>
+            <td><span class="stars">●●●<span class="empty">●●</span></span></td>
+            <td><span class="badge-warn">WARN</span></td>
+            <td style="font-size:12px;color:#5f6368">LLM analysis accurate on root cause; missed cross-island migration opportunity</td>
+            <td><button class="rec-btn">View</button></td>
+          </tr>
+          <tr>
+            <td><strong>Ceiling / Stopping Criteria</strong></td>
+            <td><span class="stars">●●<span class="empty">●●●</span></span></td>
+            <td><span class="badge-warn">WARN</span></td>
+            <td style="font-size:12px;color:#5f6368">No stopping rule; run continued 40 iters past effective ceiling of 0.720</td>
+            <td><button class="rec-btn">View</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ===== PANEL 1: SCORE PROGRESSION ===== -->
+    <div id="panel-score" class="panel">
+      <div class="chart-wrap">
+        <h3>Score Progression — All Iterations</h3>
+        <svg width="100%" viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="display:block;min-width:600px">
+          <!-- Background stagnation bands -->
+          <!-- Stagnation 1: iters 11-24, x = 40 + 11*12.5 = 177.5, width = 13*12.5 = 162.5 -->
+          <rect x="177.5" y="20" width="162.5" height="240" fill="#d93025" opacity="0.08" rx="2"/>
+          <rect x="177.5" y="20" width="162.5" height="240" fill="none" stroke="#d93025" stroke-width="1" stroke-dasharray="4,3" opacity="0.3" rx="2"/>
+          <text x="183" y="36" font-size="10" fill="#d93025" opacity="0.8" font-weight="600">STAGNATION #1</text>
+          <text x="183" y="48" font-size="9" fill="#d93025" opacity="0.7">iters 11–24</text>
+          <!-- Stagnation 2: iters 38-45, x = 40 + 38*12.5 = 515, width = 7*12.5 = 87.5 -->
+          <rect x="515" y="20" width="87.5" height="240" fill="#f9ab00" opacity="0.1" rx="2"/>
+          <rect x="515" y="20" width="87.5" height="240" fill="none" stroke="#f9ab00" stroke-width="1" stroke-dasharray="4,3" opacity="0.4" rx="2"/>
+          <text x="519" y="36" font-size="10" fill="#e37400" opacity="0.9" font-weight="600">STAGNATION #2</text>
+          <text x="519" y="48" font-size="9" fill="#e37400" opacity="0.7">iters 38–45</text>
+
+          <!-- Grid lines (Y) -->
+          <line x1="40" y1="260" x2="700" y2="260" stroke="#e0e0e0" stroke-width="1"/>
+          <line x1="40" y1="210" x2="700" y2="210" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="3,3"/>
+          <line x1="40" y1="160" x2="700" y2="160" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="3,3"/>
+          <line x1="40" y1="110" x2="700" y2="110" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="3,3"/>
+          <line x1="40" y1="60" x2="700" y2="60" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="3,3"/>
+          <line x1="40" y1="20" x2="40" y2="260" stroke="#e0e0e0" stroke-width="1"/>
+
+          <!-- Y axis labels (0.5 to 0.8) -->
+          <text x="34" y="264" font-size="10" fill="#9aa0a6" text-anchor="end">0.50</text>
+          <text x="34" y="214" font-size="10" fill="#9aa0a6" text-anchor="end">0.55</text>
+          <text x="34" y="164" font-size="10" fill="#9aa0a6" text-anchor="end">0.60</text>
+          <text x="34" y="114" font-size="10" fill="#9aa0a6" text-anchor="end">0.65</text>
+          <text x="34" y="64" font-size="10" fill="#9aa0a6" text-anchor="end">0.70</text>
+          <text x="34" y="24" font-size="10" fill="#9aa0a6" text-anchor="end">0.75</text>
+
+          <!-- X axis labels -->
+          <text x="40" y="276" font-size="10" fill="#9aa0a6" text-anchor="middle">0</text>
+          <text x="165" y="276" font-size="10" fill="#9aa0a6" text-anchor="middle">10</text>
+          <text x="290" y="276" font-size="10" fill="#9aa0a6" text-anchor="middle">20</text>
+          <text x="415" y="276" font-size="10" fill="#9aa0a6" text-anchor="middle">30</text>
+          <text x="540" y="276" font-size="10" fill="#9aa0a6" text-anchor="middle">40</text>
+          <text x="665" y="276" font-size="10" fill="#9aa0a6" text-anchor="middle">50</text>
+          <text x="380" y="292" font-size="10" fill="#9aa0a6" text-anchor="middle">Iteration</text>
+
+          <!-- Y label -->
+          <text x="10" y="145" font-size="10" fill="#9aa0a6" text-anchor="middle" transform="rotate(-90,10,145)">Score</text>
+
+          <!-- Vertical change-point lines -->
+          <!-- iter 3: x = 40 + 3*12.5 = 77.5 -->
+          <line x1="77.5" y1="20" x2="77.5" y2="260" stroke="#34a853" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.7"/>
+          <text x="80" y="75" font-size="9" fill="#34a853" font-weight="600">CP1</text>
+          <!-- iter 25: x = 40 + 25*12.5 = 352.5 -->
+          <line x1="352.5" y1="20" x2="352.5" y2="260" stroke="#34a853" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.7"/>
+          <text x="355" y="75" font-size="9" fill="#34a853" font-weight="600">CP2</text>
+          <!-- iter 42: x = 40 + 42*12.5 = 565 -->
+          <line x1="565" y1="20" x2="565" y2="260" stroke="#34a853" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.7"/>
+          <text x="568" y="75" font-size="9" fill="#34a853" font-weight="600">CP3</text>
+
+          <!-- Individual score dots (light blue) -->
+          <!-- y = 260 - (score-0.5)/0.30 * 240 -->
+          <!-- Scores: a realistic curve with noise -->
+          <g opacity="0.5">
+            <circle cx="40" cy="196" r="3" fill="#8ab4f8"/><!-- 0.512 -->
+            <circle cx="52.5" cy="178" r="3" fill="#8ab4f8"/><!-- 0.527 -->
+            <circle cx="65" cy="220" r="3" fill="#8ab4f8"/><!-- 0.500 -->
+            <circle cx="77.5" cy="150" r="3" fill="#8ab4f8"/><!-- 0.587 -->
+            <circle cx="90" cy="164" r="3" fill="#8ab4f8"/><!-- 0.573 -->
+            <circle cx="102.5" cy="135" r="3" fill="#8ab4f8"/><!-- 0.598 -->
+            <circle cx="115" cy="118" r="3" fill="#8ab4f8"/><!-- 0.614 -->
+            <circle cx="127.5" cy="125" r="3" fill="#8ab4f8"/><!-- 0.607 -->
+            <circle cx="140" cy="108" r="3" fill="#8ab4f8"/><!-- 0.623 -->
+            <circle cx="152.5" cy="101" r="3" fill="#8ab4f8"/><!-- 0.632 -->
+            <circle cx="165" cy="97" r="3" fill="#8ab4f8"/><!-- 0.636 -->
+            <circle cx="177.5" cy="120" r="3" fill="#8ab4f8"/><!-- 0.617 -->
+            <circle cx="190" cy="132" r="3" fill="#8ab4f8"/><!-- 0.605 -->
+            <circle cx="202.5" cy="115" r="3" fill="#8ab4f8"/><!-- 0.622 -->
+            <circle cx="215" cy="128" r="3" fill="#8ab4f8"/><!-- 0.609 -->
+            <circle cx="227.5" cy="140" r="3" fill="#8ab4f8"/><!-- 0.598 -->
+            <circle cx="240" cy="119" r="3" fill="#8ab4f8"/><!-- 0.618 -->
+            <circle cx="252.5" cy="108" r="3" fill="#8ab4f8"/><!-- 0.630 -->
+            <circle cx="265" cy="135" r="3" fill="#8ab4f8"/><!-- 0.606 -->
+            <circle cx="277.5" cy="122" r="3" fill="#8ab4f8"/><!-- 0.618 -->
+            <circle cx="290" cy="141" r="3" fill="#8ab4f8"/><!-- 0.600 -->
+            <circle cx="302.5" cy="130" r="3" fill="#8ab4f8"/><!-- 0.611 -->
+            <circle cx="315" cy="148" r="3" fill="#8ab4f8"/><!-- 0.595 -->
+            <circle cx="327.5" cy="138" r="3" fill="#8ab4f8"/><!-- 0.604 -->
+            <circle cx="340" cy="127" r="3" fill="#8ab4f8"/><!-- 0.614 -->
+            <circle cx="352.5" cy="86" r="3" fill="#8ab4f8"/><!-- 0.643 -->
+            <circle cx="365" cy="78" r="3" fill="#8ab4f8"/><!-- 0.650 -->
+            <circle cx="377.5" cy="69" r="3" fill="#8ab4f8"/><!-- 0.659 -->
+            <circle cx="390" cy="74" r="3" fill="#8ab4f8"/><!-- 0.654 -->
+            <circle cx="402.5" cy="60" r="3" fill="#8ab4f8"/><!-- 0.668 -->
+            <circle cx="415" cy="55" r="3" fill="#8ab4f8"/><!-- 0.673 -->
+            <circle cx="427.5" cy="66" r="3" fill="#8ab4f8"/><!-- 0.662 -->
+            <circle cx="440" cy="49" r="3" fill="#8ab4f8"/><!-- 0.678 -->
+            <circle cx="452.5" cy="58" r="3" fill="#8ab4f8"/><!-- 0.669 -->
+            <circle cx="465" cy="52" r="3" fill="#8ab4f8"/><!-- 0.675 -->
+            <circle cx="477.5" cy="44" r="3" fill="#8ab4f8"/><!-- 0.683 -->
+            <circle cx="490" cy="60" r="3" fill="#8ab4f8"/><!-- 0.668 -->
+            <circle cx="502.5" cy="48" r="3" fill="#8ab4f8"/><!-- 0.680 -->
+            <circle cx="515" cy="74" r="3" fill="#8ab4f8"/><!-- 0.654 -->
+            <circle cx="527.5" cy="88" r="3" fill="#8ab4f8"/><!-- 0.640 -->
+            <circle cx="540" cy="70" r="3" fill="#8ab4f8"/><!-- 0.659 -->
+            <circle cx="552.5" cy="80" r="3" fill="#8ab4f8"/><!-- 0.648 -->
+            <circle cx="565" cy="67" r="3" fill="#8ab4f8"/><!-- 0.661 -->
+            <circle cx="577.5" cy="60" r="3" fill="#8ab4f8"/><!-- 0.668 -->
+            <circle cx="590" cy="50" r="3" fill="#8ab4f8"/><!-- 0.678 -->
+            <circle cx="602.5" cy="44" r="3" fill="#8ab4f8"/><!-- 0.685 -->
+            <circle cx="615" cy="36" r="3" fill="#8ab4f8"/><!-- 0.693 -->
+            <circle cx="627.5" cy="40" r="3" fill="#8ab4f8"/><!-- 0.690 -->
+            <circle cx="640" cy="32" r="3" fill="#8ab4f8"/><!-- 0.698 -->
+            <circle cx="652.5" cy="28" r="3" fill="#8ab4f8"/><!-- 0.702 -->
+            <circle cx="665" cy="20" r="3" fill="#8ab4f8"/><!-- 0.731 -->
+          </g>
+
+          <!-- Rolling mean (dashed gray) -->
+          <polyline points="40,196 52.5,185 65,182 77.5,168 90,160 102.5,148 115,135 127.5,128 140,118 152.5,110 165,105 177.5,110 190,112 202.5,112 215,112 227.5,113 240,112 252.5,111 265,112 277.5,112 290,113 302.5,112 315,113 327.5,113 340,112 352.5,105 365,96 377.5,88 390,82 402.5,75 415,70 427.5,67 440,63 452.5,62 465,60 477.5,56 490,56 502.5,54 515,58 527.5,64 540,66 552.5,66 565,65 577.5,62 590,57 602.5,52 615,46 627.5,42 640,37 652.5,33 665,27" fill="none" stroke="#9aa0a6" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.8"/>
+
+          <!-- Best-so-far (bold blue) -->
+          <polyline points="40,196 52.5,178 65,178 77.5,150 90,150 102.5,135 115,118 127.5,118 140,108 152.5,101 165,97 177.5,97 190,97 202.5,97 215,97 227.5,97 240,97 252.5,97 265,97 277.5,97 290,97 302.5,97 315,97 327.5,97 340,97 352.5,86 365,78 377.5,69 390,69 402.5,60 415,55 427.5,55 440,49 452.5,49 465,49 477.5,44 490,44 502.5,44 515,44 527.5,44 540,44 552.5,44 565,44 577.5,44 590,44 602.5,44 615,36 627.5,36 640,32 652.5,28 665,20" fill="none" stroke="#1a73e8" stroke-width="2.5"/>
+
+          <!-- Green star markers at breakthroughs -->
+          <!-- iter 3: x=77.5, y=150 -->
+          <text x="77.5" y="145" font-size="14" text-anchor="middle" fill="#34a853">★</text>
+          <!-- iter 25: x=352.5, y=86 -->
+          <text x="352.5" y="81" font-size="14" text-anchor="middle" fill="#34a853">★</text>
+          <!-- iter 50: x=665, y=20 -->
+          <text x="665" y="15" font-size="14" text-anchor="middle" fill="#34a853">★</text>
+        </svg>
+
+        <div class="legend">
+          <div class="legend-item"><div class="legend-line" style="background:#1a73e8;height:3px"></div> Best-so-far</div>
+          <div class="legend-item"><div class="legend-dash"></div> Rolling mean</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#8ab4f8;opacity:.6"></div> Individual score</div>
+          <div class="legend-item"><div style="width:12px;height:12px;background:#d93025;opacity:.15;border:1px solid #d93025;border-radius:2px"></div> Stagnation (critical)</div>
+          <div class="legend-item"><div style="width:12px;height:12px;background:#f9ab00;opacity:.15;border:1px solid #f9ab00;border-radius:2px"></div> Stagnation (warning)</div>
+          <div class="legend-item"><span style="color:#34a853;font-size:14px">★</span> Breakthrough</div>
+        </div>
+      </div>
+      <div class="pill-row">
+        <div class="pill"><strong>Convergence rate:</strong> +0.004/iter</div>
+        <div class="pill"><strong>Time-to-best:</strong> 98% of compute</div>
+        <div class="pill"><strong>Plateau onset:</strong> iter 11</div>
+      </div>
+    </div>
+
+    <!-- ===== PANEL 2: ALERT PANEL ===== -->
+    <div id="panel-alerts" class="panel">
+      <div class="section-title">Alert Panel</div>
+      <div class="section-sub">Detected anomalies and stagnation periods requiring attention</div>
+
+      <div class="alert-card">
+        <div class="alert-header" onclick="toggleAlert(this)">
+          <span class="badge-crit">CRITICAL</span>
+          <span class="alert-title">Stagnation Period #1 — 14 consecutive non-improving iterations (iters 11–24)</span>
+          <span class="expand-btn">▼ Expand</span>
+        </div>
+        <div class="alert-body">
+          <table class="seq-table">
+            <thead><tr><th>Iter</th><th>Mutation Type</th><th>Failure Type</th><th>Score Δ</th><th>Format Valid</th></tr></thead>
+            <tbody>
+              <tr><td>12</td><td>diff</td><td>worse</td><td style="color:#d93025">−0.008</td><td>✓</td></tr>
+              <tr><td>14</td><td>diff</td><td>worse</td><td style="color:#d93025">−0.012</td><td>✓</td></tr>
+              <tr><td>16</td><td>diff</td><td>wrong_output</td><td style="color:#d93025">−0.021</td><td>✗</td></tr>
+              <tr><td>18</td><td>diff</td><td>partial</td><td>+0.001</td><td>✓</td></tr>
+              <tr><td>20</td><td>diff</td><td>worse</td><td style="color:#d93025">−0.006</td><td>✓</td></tr>
+              <tr><td>22</td><td>diff</td><td>timeout</td><td>0.000</td><td>✗</td></tr>
+            </tbody>
+          </table>
+          <div><span class="root-cause-badge">APPROACH_EXHAUSTION</span></div>
+          <div class="llm-block">All 14 iterations in this window applied incremental diff-based mutations to the same structural family (concentric-ring layout). The LLM consistently proposed minor parameter adjustments — radius increments, angle offsets — without escaping the local optimum. The search was effectively trapped in a single valley with no gradient signal to indicate a path out. The mutation instruction set did not include any trigger for switching to full structural rewrites, leaving the system unable to self-correct.</div>
+          <div class="rec-box"><strong>Recommendation:</strong> Diversify mutation strategy — introduce full-rewrite operator when diff-only streak exceeds 5 iterations. Alternatively, implement an adaptive temperature schedule that forces cross-island migration when no improvement is observed for 3+ consecutive iters.</div>
+        </div>
+      </div>
+
+      <div class="alert-card">
+        <div class="alert-header" onclick="toggleAlert(this)">
+          <span class="badge-warn">WARNING</span>
+          <span class="alert-title">Stagnation Period #2 — 8 consecutive non-improving iterations (iters 38–45)</span>
+          <span class="expand-btn">▼ Expand</span>
+        </div>
+        <div class="alert-body">
+          <table class="seq-table">
+            <thead><tr><th>Iter</th><th>Mutation Type</th><th>Failure Type</th><th>Score Δ</th><th>Format Valid</th></tr></thead>
+            <tbody>
+              <tr><td>39</td><td>cross</td><td>wrong_output</td><td style="color:#d93025">−0.003</td><td>✗</td></tr>
+              <tr><td>40</td><td>cross</td><td>format_invalid</td><td>0.000</td><td>✗</td></tr>
+              <tr><td>41</td><td>diff</td><td>worse</td><td style="color:#d93025">−0.009</td><td>✓</td></tr>
+              <tr><td>42</td><td>diff</td><td>partial</td><td>+0.002</td><td>✓</td></tr>
+              <tr><td>43</td><td>cross</td><td>format_invalid</td><td>0.000</td><td>✗</td></tr>
+              <tr><td>44</td><td>full_rewrite</td><td>worse</td><td style="color:#d93025">−0.014</td><td>✓</td></tr>
+            </tbody>
+          </table>
+          <div><span class="root-cause-badge">FORMAT_ISSUE</span></div>
+          <div class="llm-block">This stagnation window was driven primarily by format validation failures on cross-pollination mutations. The system prompt for cross-island mutations did not clearly specify the expected output format, leading the LLM to produce valid-logic but incorrectly structured responses that failed the evaluator's format parser. 3 of 8 iterations were wasted entirely on format errors, and the remaining 5 produced marginal or negative score deltas due to the underlying algorithmic approach being suboptimal at this score level.</div>
+          <div class="rec-box"><strong>Recommendation:</strong> Add an explicit format schema with a worked example to the cross-island mutation system prompt. Consider a lightweight format-validation pre-check before the full evaluator pipeline to avoid wasting cascade evaluation cost on malformed outputs.</div>
+        </div>
+      </div>
+
+      <div class="obs-section">
+        <h4>Novel Observations</h4>
+        <ul>
+          <li>The LLM flagged a previously unknown correlation: iterations following a <em>timeout failure</em> had a 78% chance of also failing on the next iteration, suggesting a pathological input size regime that persists across mutations.</li>
+          <li>Island 1 consistently generated diverse structural families while Island 2 tended to collapse to parameter-tweaking within 3 iterations of any successful solution — a "local gravity" effect not documented in prior runs.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ===== PANEL 3: FAILURE BUDGET ===== -->
+    <div id="panel-budget" class="panel">
+      <div class="section-title">Failure Budget</div>
+      <div class="section-sub">Distribution of outcomes across 51 iterations</div>
+      <div class="budget-bar-wrap">
+        <div class="stacked-bar">
+          <div class="seg" style="width:31%;background:#34a853" title="success 31%">31%</div>
+          <div class="seg" style="width:18%;background:#81c995" title="partial 18%">18%</div>
+          <div class="seg" style="width:22%;background:#e37400" title="worse 22%">22%</div>
+          <div class="seg" style="width:12%;background:#d93025" title="wrong_output 12%">12%</div>
+          <div class="seg" style="width:5%;background:#9aa0a6" title="timeout 5%">5%</div>
+          <div class="seg" style="width:4%;background:#7b2218" title="crash 4%">4%</div>
+          <div class="seg" style="width:8%;background:#f9ab00;color:#202124" title="format_invalid 8%">8%</div>
+        </div>
+        <div class="budget-legend">
+          <div class="budget-legend-item"><div class="color-sq" style="background:#34a853"></div> success (31%)</div>
+          <div class="budget-legend-item"><div class="color-sq" style="background:#81c995"></div> partial (18%)</div>
+          <div class="budget-legend-item"><div class="color-sq" style="background:#e37400"></div> worse (22%)</div>
+          <div class="budget-legend-item"><div class="color-sq" style="background:#d93025"></div> wrong_output (12%)</div>
+          <div class="budget-legend-item"><div class="color-sq" style="background:#9aa0a6"></div> timeout (5%)</div>
+          <div class="budget-legend-item"><div class="color-sq" style="background:#7b2218"></div> crash (4%)</div>
+          <div class="budget-legend-item"><div class="color-sq" style="background:#f9ab00"></div> format_invalid (8%)</div>
+        </div>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Mode</th><th>Count</th><th>%</th><th>Avg Δscore</th></tr></thead>
+        <tbody>
+          <tr><td><span style="color:#34a853;font-weight:600">success</span></td><td>16</td><td>31.4%</td><td style="color:#34a853">+0.042</td></tr>
+          <tr><td><span style="color:#81c995;font-weight:600">partial</span></td><td>9</td><td>17.6%</td><td style="color:#34a853">+0.009</td></tr>
+          <tr><td><span style="color:#e37400;font-weight:600">worse</span></td><td>11</td><td>21.6%</td><td style="color:#d93025">−0.018</td></tr>
+          <tr><td><span style="color:#d93025;font-weight:600">wrong_output</span></td><td>6</td><td>11.8%</td><td style="color:#d93025">−0.031</td></tr>
+          <tr><td><span style="color:#9aa0a6;font-weight:600">timeout</span></td><td>3</td><td>5.9%</td><td>0.000</td></tr>
+          <tr><td><span style="color:#7b2218;font-weight:600">crash</span></td><td>2</td><td>3.9%</td><td>0.000</td></tr>
+          <tr><td><span style="color:#c79a00;font-weight:600">format_invalid</span></td><td>4</td><td>7.8%</td><td>0.000</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ===== PANEL 4: MUTATION EFFECTIVENESS ===== -->
+    <div id="panel-mutation" class="panel">
+      <div class="section-title">Mutation Effectiveness</div>
+      <div class="section-sub">Success rate breakdown by mutation type, model, and island</div>
+      <div class="three-col">
+        <div class="panel-card">
+          <h4>By Mutation Type</h4>
+          <svg width="100%" viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+            <!-- diff: 58%, full_rewrite: 71%, cross: 44% -->
+            <!-- bar height = rate * 100, baseline y=140 -->
+            <rect x="20" y="82" width="44" height="58" fill="#1a73e8" rx="3"/>
+            <rect x="80" y="69" width="44" height="71" fill="#34a853" rx="3"/>
+            <rect x="140" y="96" width="44" height="44" fill="#e37400" rx="3"/>
+            <text x="42" y="78" font-size="11" font-weight="700" fill="#1a73e8" text-anchor="middle">58%</text>
+            <text x="102" y="65" font-size="11" font-weight="700" fill="#34a853" text-anchor="middle">71%</text>
+            <text x="162" y="92" font-size="11" font-weight="700" fill="#e37400" text-anchor="middle">44%</text>
+            <line x1="10" y1="140" x2="195" y2="140" stroke="#e0e0e0" stroke-width="1"/>
+            <text x="42" y="153" font-size="9" fill="#5f6368" text-anchor="middle">diff</text>
+            <text x="102" y="153" font-size="9" fill="#5f6368" text-anchor="middle">full_rewrite</text>
+            <text x="162" y="153" font-size="9" fill="#5f6368" text-anchor="middle">cross</text>
+            <text x="10" y="143" font-size="8" fill="#9aa0a6" text-anchor="end">0%</text>
+            <text x="10" y="70" font-size="8" fill="#9aa0a6" text-anchor="end">70%</text>
+          </svg>
+        </div>
+        <div class="panel-card">
+          <h4>By LLM Model</h4>
+          <div style="margin-top:8px">
+            <div style="margin-bottom:14px">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="font-weight:600">gpt-4o</span><span style="color:#34a853;font-weight:700">62%</span></div>
+              <div style="background:#e0e0e0;border-radius:4px;height:12px;overflow:hidden"><div style="width:62%;height:100%;background:#34a853;border-radius:4px"></div></div>
+              <div style="font-size:10px;color:#9aa0a6;margin-top:2px">21 iters · $3.14</div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="font-weight:600">gpt-4o-mini</span><span style="color:#e37400;font-weight:700">41%</span></div>
+              <div style="background:#e0e0e0;border-radius:4px;height:12px;overflow:hidden"><div style="width:41%;height:100%;background:#e37400;border-radius:4px"></div></div>
+              <div style="font-size:10px;color:#9aa0a6;margin-top:2px">30 iters · $1.09</div>
+            </div>
+          </div>
+        </div>
+        <div class="panel-card">
+          <h4>By Island</h4>
+          <table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:4px">
+            <thead><tr><th style="text-align:left;padding:5px 6px;color:#5f6368;border-bottom:1px solid #e0e0e0">Island</th><th style="padding:5px 6px;color:#5f6368;border-bottom:1px solid #e0e0e0">Iters</th><th style="padding:5px 6px;color:#5f6368;border-bottom:1px solid #e0e0e0">Success</th></tr></thead>
+            <tbody>
+              <tr><td style="padding:6px">Island 0</td><td style="padding:6px;text-align:center">18</td><td style="padding:6px;text-align:center;color:#e37400;font-weight:700">55%</td></tr>
+              <tr style="background:#f8f9fa"><td style="padding:6px">Island 1</td><td style="padding:6px;text-align:center">17</td><td style="padding:6px;text-align:center;color:#34a853;font-weight:700">67%</td></tr>
+              <tr><td style="padding:6px">Island 2</td><td style="padding:6px;text-align:center">16</td><td style="padding:6px;text-align:center;color:#d93025;font-weight:700">49%</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel-card" style="background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:16px 18px">
+        <h4 style="font-size:12px;font-weight:700;color:#5f6368;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Mutation Type × Island — Success Rate</h4>
+        <table class="cross-table">
+          <thead>
+            <tr><th></th><th>Island 0</th><th>Island 1</th><th>Island 2</th><th>Overall</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="row-head">diff</td><td class="heat-yellow">54%</td><td class="heat-green">66%</td><td class="heat-yellow">52%</td><td class="heat-yellow">58%</td></tr>
+            <tr><td class="row-head">full_rewrite</td><td class="heat-green">69%</td><td class="heat-green">78%</td><td class="heat-green">65%</td><td class="heat-green">71%</td></tr>
+            <tr><td class="row-head">cross</td><td class="heat-red">38%</td><td class="heat-yellow">51%</td><td class="heat-red">40%</td><td class="heat-red">44%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== PANEL 5: COMPLIANCE × SCORE ===== -->
+    <div id="panel-compliance" class="panel">
+      <div class="section-title">Compliance × Score</div>
+      <div class="section-sub">Relationship between instruction compliance and evolutionary outcomes</div>
+      <div class="chart-wrap">
+        <table class="dim-table">
+          <thead><tr><th>Compliance Level</th><th>Count</th><th>Success Rate</th><th>Avg Δscore</th><th>Avg Abs Score</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>fully_compliant</strong></td>
+              <td><span style="background:#e8f0fe;border-radius:4px;padding:2px 8px;font-size:12px;color:#1a55c0;font-weight:700">32 iters</span></td>
+              <td class="heat-green" style="border-radius:4px;font-weight:700;font-size:13px">42%</td>
+              <td class="heat-green" style="font-weight:700;font-size:13px">+0.031</td>
+              <td class="heat-green" style="font-weight:700;font-size:13px">0.698</td>
+            </tr>
+            <tr>
+              <td><strong>partially_compliant</strong></td>
+              <td><span style="background:#fef7e0;border-radius:4px;padding:2px 8px;font-size:12px;color:#8a6400;font-weight:700">14 iters</span></td>
+              <td class="heat-yellow" style="font-weight:700;font-size:13px">18%</td>
+              <td class="heat-yellow" style="font-weight:700;font-size:13px">+0.004</td>
+              <td class="heat-yellow" style="font-weight:700;font-size:13px">0.661</td>
+            </tr>
+            <tr>
+              <td><strong>non_compliant</strong></td>
+              <td><span style="background:#fce8e6;border-radius:4px;padding:2px 8px;font-size:12px;color:#c5221f;font-weight:700">5 iters</span></td>
+              <td class="heat-red" style="font-weight:700;font-size:13px">3%</td>
+              <td class="heat-red" style="font-weight:700;font-size:13px">−0.012</td>
+              <td class="heat-red" style="font-weight:700;font-size:13px">0.601</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="insight-box">
+        <strong>Key Insight:</strong> Instruction compliance is the single strongest predictor of iteration success in this run. Fully compliant iterations achieve a 42% success rate and average +0.031 score delta — over 10× the delta of partially compliant iterations. Non-compliant iterations produced a net negative delta, actively harming the best-so-far score in 2 cases. Strengthening system prompt clarity and adding format validation pre-checks should be the highest-priority intervention for the next run.
+      </div>
+    </div>
+
+    <!-- ===== PANEL 6: CASCADE STAGE DISTRIBUTION ===== -->
+    <div id="panel-cascade" class="panel">
+      <div class="section-title">Cascade Stage Distribution</div>
+      <div class="section-sub">Where in the evaluation pipeline do failures occur?</div>
+      <div class="chart-wrap">
+        <svg width="100%" viewBox="0 0 500 220" xmlns="http://www.w3.org/2000/svg" style="display:block">
+          <!-- bars: S1=8, S2=12, S3=7, Passed=24; max=24, scale: height = count/24 * 160 -->
+          <!-- S1: 8/24*160=53.3, y=140-53=87 -->
+          <rect x="50" y="87" width="70" height="53" fill="#d93025" rx="4"/>
+          <!-- S2: 12/24*160=80, y=140-80=60 -->
+          <rect x="155" y="60" width="70" height="80" fill="#e37400" rx="4"/>
+          <!-- S3: 7/24*160=46.7, y=140-47=93 -->
+          <rect x="260" y="93" width="70" height="47" fill="#f9ab00" rx="4"/>
+          <!-- Passed: 24/24*160=160, y=140-160=-20→20 -->
+          <rect x="365" y="20" width="70" height="120" fill="#34a853" rx="4"/>
+
+          <line x1="30" y1="140" x2="480" y2="140" stroke="#e0e0e0" stroke-width="1"/>
+          <line x1="30" y1="20" x2="30" y2="140" stroke="#e0e0e0" stroke-width="1"/>
+
+          <!-- Y labels -->
+          <text x="25" y="143" font-size="10" fill="#9aa0a6" text-anchor="end">0</text>
+          <text x="25" y="103" font-size="10" fill="#9aa0a6" text-anchor="end">6</text>
+          <text x="25" y="63" font-size="10" fill="#9aa0a6" text-anchor="end">12</text>
+          <text x="25" y="23" font-size="10" fill="#9aa0a6" text-anchor="end">24</text>
+          <line x1="28" y1="100" x2="480" y2="100" stroke="#f1f3f4" stroke-width="1"/>
+          <line x1="28" y1="60" x2="480" y2="60" stroke="#f1f3f4" stroke-width="1"/>
+          <line x1="28" y1="20" x2="480" y2="20" stroke="#f1f3f4" stroke-width="1"/>
+
+          <!-- Labels above bars -->
+          <text x="85" y="82" font-size="13" font-weight="700" fill="#d93025" text-anchor="middle">8</text>
+          <text x="190" y="55" font-size="13" font-weight="700" fill="#e37400" text-anchor="middle">12</text>
+          <text x="295" y="88" font-size="13" font-weight="700" fill="#c79a00" text-anchor="middle">7</text>
+          <text x="400" y="15" font-size="13" font-weight="700" fill="#34a853" text-anchor="middle">24</text>
+
+          <!-- X labels -->
+          <text x="85" y="156" font-size="11" fill="#5f6368" text-anchor="middle">Stage 1</text>
+          <text x="190" y="156" font-size="11" fill="#5f6368" text-anchor="middle">Stage 2</text>
+          <text x="295" y="156" font-size="11" fill="#5f6368" text-anchor="middle">Stage 3</text>
+          <text x="400" y="156" font-size="11" fill="#5f6368" text-anchor="middle">Passed All</text>
+
+          <text x="255" y="180" font-size="10" fill="#9aa0a6" text-anchor="middle">Evaluation Stage</text>
+          <text x="14" y="80" font-size="10" fill="#9aa0a6" text-anchor="middle" transform="rotate(-90,14,80)">Count</text>
+        </svg>
+      </div>
+      <div class="insight-box">
+        <strong>Stage 2 failures dominate (12 out of 27 total failures = 44%).</strong> This pattern indicates the failure is not primarily a function of LLM output quality — Stage 1 passes most solutions — but rather a systematic issue in the evaluator's Stage 2 logic: the IndexError boundary guard is absent, causing 60% of Stage 2 failures. Fixing the evaluator code would immediately increase the pass-through rate and unblock a large fraction of the 12 failed iterations, potentially improving the effective success rate by 8–12 percentage points.
+      </div>
+    </div>
+
+    <!-- ===== PANEL 7: EVALUATOR ARTIFACT CLUSTERS ===== -->
+    <div id="panel-artifacts" class="panel">
+      <div class="section-title">Evaluator Artifact Clusters</div>
+      <div class="section-sub">Recurring error patterns detected across evaluation runs</div>
+
+      <div class="artifact-card">
+        <div class="artifact-header">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:700;color:#202124;margin-bottom:6px"><code style="background:#f1f3f4;padding:2px 6px;border-radius:3px;font-size:12px">IndexError: list index out of range</code></div>
+            <div class="artifact-freq-bar" style="width:60.5%"></div>
+            <div class="freq-label">60.5% of all failures (16 occurrences)</div>
+          </div>
+          <span class="count-badge">16</span>
+        </div>
+        <div style="font-size:12px;color:#5f6368;margin-bottom:8px"><strong>Root cause:</strong> The evaluator's circle-placement verification loop accesses <code>placed_circles[i+1]</code> without checking that <code>i+1 &lt; len(placed_circles)</code>, causing an out-of-bounds error on the final circle in any solution that places all circles successfully.</div>
+        <div class="rec-box"><strong>Recommendation:</strong> Add boundary guard to system message — instruct the LLM to wrap placement loops with an explicit length check. Alternatively, patch the evaluator directly: replace <code>placed_circles[i+1]</code> with <code>placed_circles[i+1] if i+1 &lt; len(placed_circles) else None</code>.</div>
+      </div>
+
+      <div class="artifact-card">
+        <div class="artifact-header">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:700;color:#202124;margin-bottom:6px"><code style="background:#f1f3f4;padding:2px 6px;border-radius:3px;font-size:12px">RecursionError: maximum recursion depth exceeded</code></div>
+            <div class="artifact-freq-bar" style="width:23.1%;background:#e37400"></div>
+            <div class="freq-label">23.1% of all failures (6 occurrences)</div>
+          </div>
+          <span class="count-badge" style="background:#fff3e0;color:#e65100">6</span>
+        </div>
+        <div style="font-size:12px;color:#5f6368;margin-bottom:8px"><strong>Root cause:</strong> Several full_rewrite mutations generated recursive packing algorithms (quad-tree subdivision approaches) that exceed Python's default recursion limit of 1000 when applied to inputs with &gt;200 circles. The evaluator does not set a custom recursion limit or catch this exception class separately.</div>
+        <div class="rec-box"><strong>Recommendation:</strong> Add <code>sys.setrecursionlimit(5000)</code> to the evaluator harness, and add a specific <code>except RecursionError</code> handler that returns a timeout result rather than propagating the exception. Also add a note to the mutation system prompt discouraging unbounded recursion in favor of iterative approaches.</div>
+      </div>
+
+      <div class="artifact-card">
+        <div class="artifact-header">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:700;color:#202124;margin-bottom:6px"><code style="background:#f1f3f4;padding:2px 6px;border-radius:3px;font-size:12px">Timeout: circle placement loop &gt; 30s</code></div>
+            <div class="artifact-freq-bar" style="width:10.2%;background:#9aa0a6"></div>
+            <div class="freq-label">10.2% of all failures (3 occurrences) — all timeout class</div>
+          </div>
+          <span class="count-badge" style="background:#f1f3f4;color:#5f6368">3</span>
+        </div>
+        <div style="font-size:12px;color:#5f6368;margin-bottom:8px"><strong>Root cause:</strong> Three iterations produced O(n²) or O(n³) collision detection routines that exceeded the 30-second wall-clock timeout. All three occurred on large test cases (n=500 circles). The mutation prompts did not include complexity constraints, and the evaluator timeout message does not feed back the execution time to the LLM for self-correction.</div>
+        <div class="rec-box"><strong>Recommendation:</strong> Add a complexity hint to the mutation system prompt: "Target O(n log n) or better for placement and collision detection." Feed execution time back in the evaluator result so the LLM can self-correct on the next iteration. Consider lowering timeout to 15s for faster feedback loops.</div>
+      </div>
+    </div>
+
+    <!-- ===== PANEL 8: EFFICIENCY CURVE ===== -->
+    <div id="panel-efficiency" class="panel">
+      <div class="section-title">Efficiency Curve</div>
+      <div class="section-sub">Cumulative cost vs. score improvement — where was compute well spent?</div>
+      <div class="two-col">
+        <div class="chart-wrap" style="margin-bottom:0">
+          <h3>Cumulative Cost vs. Best Score</h3>
+          <svg width="100%" viewBox="0 0 340 230" xmlns="http://www.w3.org/2000/svg" style="display:block">
+            <!-- Productive zone: iter 0–11, x ~0 to 110 on cost axis -->
+            <rect x="40" y="20" width="88" height="180" fill="#34a853" opacity="0.08" rx="2"/>
+            <!-- Wasted zone: iter 11–51, x ~88 to 330 on cost axis -->
+            <rect x="128" y="20" width="182" height="180" fill="#d93025" opacity="0.05" rx="2"/>
+
+            <!-- Grid -->
+            <line x1="40" y1="200" x2="320" y2="200" stroke="#e0e0e0" stroke-width="1"/>
+            <line x1="40" y1="20" x2="40" y2="200" stroke="#e0e0e0" stroke-width="1"/>
+            <line x1="40" y1="160" x2="320" y2="160" stroke="#f1f3f4" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="40" y1="120" x2="320" y2="120" stroke="#f1f3f4" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="40" y1="80" x2="320" y2="80" stroke="#f1f3f4" stroke-width="1" stroke-dasharray="3,3"/>
+
+            <!-- Plateau line at x=128 -->
+            <line x1="128" y1="20" x2="128" y2="200" stroke="#d93025" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
+            <text x="131" y="35" font-size="9" fill="#d93025" font-weight="600">Plateau</text>
+            <text x="131" y="45" font-size="9" fill="#d93025">$0.76</text>
+
+            <!-- Zone labels -->
+            <text x="60" y="215" font-size="9" fill="#34a853" font-weight="600">Productive</text>
+            <text x="190" y="215" font-size="9" fill="#d93025" font-weight="600">Diminishing returns</text>
+
+            <!-- Y axis labels (cost: $0 to $4.50) -->
+            <text x="36" y="203" font-size="9" fill="#9aa0a6" text-anchor="end">$0</text>
+            <text x="36" y="163" font-size="9" fill="#9aa0a6" text-anchor="end">$1.50</text>
+            <text x="36" y="123" font-size="9" fill="#9aa0a6" text-anchor="end">$3.00</text>
+            <text x="36" y="83" font-size="9" fill="#9aa0a6" text-anchor="end">$4.50</text>
+
+            <!-- X axis labels -->
+            <text x="40" y="224" font-size="9" fill="#9aa0a6" text-anchor="middle">0</text>
+            <text x="128" y="224" font-size="9" fill="#9aa0a6" text-anchor="middle">iter 11</text>
+            <text x="320" y="224" font-size="9" fill="#9aa0a6" text-anchor="middle">iter 51</text>
+
+            <!-- Best score line (secondary, blue) — score 0.5 to 0.75 mapped to y 200-20 = 180px range -->
+            <!-- y = 200 - (score-0.5)/0.25*180 -->
+            <!-- cost x: $0=40, $4.23=320, scale = 280/4.23 = 66.2/$ -->
+            <polyline points="40,198 56,162 72,138 88,111 104,95 120,80 128,77 168,75 208,75 248,73 288,71 320,69" fill="none" stroke="#1a73e8" stroke-width="2" stroke-dasharray="5,3"/>
+
+            <!-- Cumulative cost curve -->
+            <polyline points="40,200 56,192 72,184 88,175 104,166 120,156 128,151 168,125 208,100 248,76 288,60 320,49" fill="none" stroke="#e37400" stroke-width="2"/>
+
+            <text x="290" y="66" font-size="9" fill="#e37400">Cost</text>
+            <text x="290" y="58" font-size="9" fill="#1a73e8">Score</text>
+          </svg>
+        </div>
+        <div class="chart-wrap" style="margin-bottom:0">
+          <h3>Pareto Frontier — Cost vs. Best Score</h3>
+          <svg width="100%" viewBox="0 0 300 230" xmlns="http://www.w3.org/2000/svg" style="display:block">
+            <!-- Grid -->
+            <line x1="40" y1="200" x2="280" y2="200" stroke="#e0e0e0" stroke-width="1"/>
+            <line x1="40" y1="20" x2="40" y2="200" stroke="#e0e0e0" stroke-width="1"/>
+            <!-- Pareto dots: (cost, score) — x=40+(cost/4.5*240), y=200-(score-0.5)/0.3*180 -->
+            <!-- Key iters: 0: $0.02, 0.512; 3: $0.18, 0.587; 11: $0.76, 0.694; 25: $1.88, 0.718; 40: $2.93, 0.721; 50: $3.81, 0.731; 51: $4.23, 0.731 -->
+            <circle cx="41" cy="198" r="4" fill="#9aa0a6" opacity=".6"/><text x="44" y="202" font-size="8" fill="#9aa0a6">0</text>
+            <circle cx="50" cy="165" r="5" fill="#34a853" opacity=".8"/><text x="53" y="163" font-size="8" fill="#34a853">iter 3</text>
+            <circle cx="81" cy="116" r="6" fill="#34a853" opacity=".8"/><text x="84" y="114" font-size="8" fill="#34a853">iter 11</text>
+            <circle cx="166" cy="103" r="5" fill="#1a73e8" opacity=".7"/><text x="169" y="101" font-size="8" fill="#1a73e8">iter 25</text>
+            <circle cx="236" cy="101" r="4" fill="#e37400" opacity=".6"/><text x="239" y="99" font-size="8" fill="#e37400">iter 40</text>
+            <circle cx="256" cy="95" r="4" fill="#e37400" opacity=".6"/>
+            <circle cx="283" cy="95" r="6" fill="#d93025" opacity=".9"/><text x="274" y="88" font-size="8" fill="#d93025">iter 51</text>
+            <!-- Pareto frontier line -->
+            <polyline points="41,198 50,165 81,116 166,103 283,95" fill="none" stroke="#34a853" stroke-width="1.5" stroke-dasharray="4,3" opacity=".6"/>
+            <!-- Labels -->
+            <text x="160" y="216" font-size="9" fill="#9aa0a6" text-anchor="middle">Cumulative LLM Cost ($)</text>
+            <text x="14" y="110" font-size="9" fill="#9aa0a6" text-anchor="middle" transform="rotate(-90,14,110)">Best Score</text>
+            <text x="40" y="215" font-size="9" fill="#9aa0a6">$0</text>
+            <text x="280" y="215" font-size="9" fill="#9aa0a6" text-anchor="end">$4.50</text>
+            <text x="36" y="203" font-size="9" fill="#9aa0a6" text-anchor="end">0.50</text>
+            <text x="36" y="23" font-size="9" fill="#9aa0a6" text-anchor="end">0.73</text>
+          </svg>
+        </div>
+      </div>
+      <div class="metric-4">
+        <div class="metric-card"><div class="m-label">Cost per Improvement</div><div class="m-val">$0.38</div><div class="m-sub">per +0.01 score unit</div></div>
+        <div class="metric-card"><div class="m-label">Compute After Plateau</div><div class="m-val" style="color:#d93025">82%</div><div class="m-sub">$3.47 of $4.23 total</div></div>
+        <div class="metric-card"><div class="m-label">Top 90% Gain In</div><div class="m-val" style="color:#34a853">11 iters</div><div class="m-sub">$0.76 · 18% of budget</div></div>
+        <div class="metric-card"><div class="m-label">Total Cost</div><div class="m-val">$4.23</div><div class="m-sub">51 iterations</div></div>
+      </div>
+    </div>
+
+    <!-- ===== PANEL 9: EXPLORATION VS EXPLOITATION ===== -->
+    <div id="panel-explore" class="panel">
+      <div class="section-title">Exploration vs. Exploitation Timeline</div>
+      <div class="section-sub">Phase classification and mutation type per iteration</div>
+      <div class="chart-wrap">
+        <svg width="100%" viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg" style="display:block;min-width:600px">
+          <!-- Stagnation bands -->
+          <rect x="177.5" y="10" width="162.5" height="170" fill="#d93025" opacity="0.06"/>
+          <rect x="515" y="10" width="87.5" height="170" fill="#f9ab00" opacity="0.08"/>
+
+          <!-- Top swimlane: phases (y 10–80) -->
+          <rect x="40" y="10" width="660" height="70" fill="#f8f9fa" rx="3"/>
+          <text x="36" y="50" font-size="9" fill="#9aa0a6" text-anchor="end" transform="rotate(-90,36,50)">Phase</text>
+
+          <!-- Explore 0-5: x=40 to 40+5*12.5=102.5, w=62.5 -->
+          <rect x="40" y="14" width="62.5" height="62" fill="#00897b" rx="2" opacity=".85"/>
+          <text x="71" y="49" font-size="9" fill="#fff" text-anchor="middle" font-weight="600">Explore</text>
+          <!-- Exploit 6-11: x=115, w=75 -->
+          <rect x="115" y="14" width="75" height="62" fill="#e37400" rx="2" opacity=".85"/>
+          <text x="152.5" y="49" font-size="9" fill="#fff" text-anchor="middle" font-weight="600">Exploit</text>
+          <!-- Explore 12-18: x=190, w=87.5 -->
+          <rect x="190" y="14" width="87.5" height="62" fill="#00897b" rx="2" opacity=".85"/>
+          <text x="233.5" y="49" font-size="9" fill="#fff" text-anchor="middle" font-weight="600">Explore</text>
+          <!-- Exploit 19-24: x=277.5, w=75 -->
+          <rect x="277.5" y="14" width="75" height="62" fill="#e37400" rx="2" opacity=".85"/>
+          <text x="315" y="49" font-size="9" fill="#fff" text-anchor="middle" font-weight="600">Exploit</text>
+          <!-- Explore 25-32: x=352.5, w=100 -->
+          <rect x="352.5" y="14" width="100" height="62" fill="#00897b" rx="2" opacity=".85"/>
+          <text x="402.5" y="49" font-size="9" fill="#fff" text-anchor="middle" font-weight="600">Explore</text>
+          <!-- Exploit 33-51: x=452.5, w=237.5 -->
+          <rect x="452.5" y="14" width="247.5" height="62" fill="#e37400" rx="2" opacity=".85"/>
+          <text x="576" y="49" font-size="9" fill="#fff" text-anchor="middle" font-weight="600">Exploit (extended)</text>
+
+          <!-- Phase labels -->
+          <text x="40" y="84" font-size="8" fill="#9aa0a6">0</text>
+          <text x="115" y="84" font-size="8" fill="#9aa0a6">6</text>
+          <text x="190" y="84" font-size="8" fill="#9aa0a6">12</text>
+          <text x="277.5" y="84" font-size="8" fill="#9aa0a6">19</text>
+          <text x="352.5" y="84" font-size="8" fill="#9aa0a6">25</text>
+          <text x="452.5" y="84" font-size="8" fill="#9aa0a6">33</text>
+          <text x="700" y="84" font-size="8" fill="#9aa0a6" text-anchor="end">51</text>
+
+          <!-- Bottom swimlane: mutation types per iter (y 90–160) -->
+          <rect x="40" y="90" width="660" height="70" fill="#f8f9fa" rx="3"/>
+          <text x="36" y="130" font-size="9" fill="#9aa0a6" text-anchor="end" transform="rotate(-90,36,130)">Mut.</text>
+
+          <!-- Each iter gets width 12.5, colored by mutation type -->
+          <!-- diff=blue, full_rewrite=green, cross=purple -->
+          <!-- iters 0-51, simplified pattern -->
+          <g>
+            <!-- 0-5 explore: mix of diff and full_rewrite -->
+            <rect x="40" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="52.5" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/><rect x="65" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="77.5" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/><rect x="90" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="102.5" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/>
+            <!-- 6-11 exploit: diff heavy -->
+            <rect x="115" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="127.5" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="140" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="152.5" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/><rect x="165" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="177.5" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/>
+            <!-- 12-18 explore (stagnation): diff heavy -->
+            <rect x="190" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="202.5" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="215" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="227.5" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="240" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/><rect x="252.5" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="265" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/>
+            <!-- 19-24 exploit (stagnation cont): diff -->
+            <rect x="277.5" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="290" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="302.5" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/><rect x="315" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="327.5" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="340" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/>
+            <!-- 25-32 explore: full_rewrite heavy -->
+            <rect x="352.5" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/><rect x="365" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/><rect x="377.5" y="94" width="11" height="62" fill="#8b5cf6" opacity=".7" rx="1"/><rect x="390" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/><rect x="402.5" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/><rect x="415" y="94" width="11" height="62" fill="#8b5cf6" opacity=".7" rx="1"/><rect x="427.5" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/><rect x="440" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/>
+            <!-- 33-45 exploit+stagnation2: mix -->
+            <rect x="452.5" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="465" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="477.5" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/><rect x="490" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="502.5" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="515" y="94" width="11" height="62" fill="#8b5cf6" opacity=".7" rx="1"/><rect x="527.5" y="94" width="11" height="62" fill="#8b5cf6" opacity=".7" rx="1"/><rect x="540" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="552.5" y="94" width="11" height="62" fill="#8b5cf6" opacity=".7" rx="1"/><rect x="565" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="577.5" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/>
+            <!-- 46-51 exploit: mix diff/full -->
+            <rect x="590" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/><rect x="602.5" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="615" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/><rect x="627.5" y="94" width="11" height="62" fill="#1a73e8" opacity=".7" rx="1"/><rect x="640" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/><rect x="652.5" y="94" width="11" height="62" fill="#34a853" opacity=".7" rx="1"/>
+          </g>
+
+          <!-- Swimlane labels -->
+          <text x="36" y="12" font-size="10" fill="#5f6368" font-weight="600" text-anchor="end">Phase</text>
+          <text x="36" y="92" font-size="10" fill="#5f6368" font-weight="600" text-anchor="end">Mut.</text>
+        </svg>
+        <div class="legend" style="margin-top:10px">
+          <div class="legend-item"><div class="legend-dot" style="background:#00897b"></div> Explore phase</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#e37400"></div> Exploit phase</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#1a73e8"></div> diff mutation</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#34a853"></div> full_rewrite</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div> cross-island</div>
+          <div class="legend-item"><div style="width:12px;height:12px;background:#d93025;opacity:.15;border-radius:2px;border:1px solid #d93025"></div> Stagnation</div>
+        </div>
+      </div>
+      <div class="pill-row">
+        <div class="pill"><strong>Explore ratio:</strong> 44% of iterations</div>
+        <div class="pill"><strong>Exploit ratio:</strong> 56% of iterations</div>
+        <div class="pill"><strong>Structural families:</strong> 5 identified</div>
+      </div>
+      <div class="insight-box" style="margin-top:14px">
+        <strong>Strategy cluster analysis:</strong> 5 distinct structural families were identified across the run. Family #1 (concentric rings) dominated iters 0–24, comprising 47% of all attempts. Family #2 (incremental parameter tweaking within a radial grid) accounted for <strong>73% of iterations</strong> in the post-plateau exploitation phase (iters 25–51), but yielded only 3 score improvements &gt;0.010. Families #3 (quad-tree subdivision), #4 (force-directed placement), and #5 (spiral packing) each appeared only during explore phases and were responsible for all 3 major breakthroughs.
+      </div>
+    </div>
+
+    <!-- ===== PANEL 10: IN-FLIGHT MODE ===== -->
+    <div id="panel-inflight" class="panel">
+      <!-- Status bar -->
+      <div class="status-bar">
+        <div class="pulse"></div>
+        <div class="sb-item"><div class="sb-label">Status</div><div class="sb-val">Run in progress</div></div>
+        <div class="sb-item"><div class="sb-label">Experiment</div><div class="sb-val">circle_packing_v3</div></div>
+        <div class="sb-item"><div class="sb-label">Iteration</div><div class="sb-val">34 / ~100</div></div>
+        <div class="sb-item"><div class="sb-label">Best Score</div><div class="sb-val">0.718</div></div>
+        <div class="sb-item"><div class="sb-label">Active Streak</div><div class="sb-val">0</div></div>
+        <div class="sb-item"><div class="sb-label">Analyzer Cost</div><div class="sb-val">$1.82</div></div>
+        <div class="sb-item"><div class="sb-label">Last Update</div><div class="sb-val">3s ago</div></div>
+      </div>
+
+      <div class="inflight-layout">
+        <div>
+          <!-- Truncated score chart -->
+          <div class="chart-wrap">
+            <h3>Score Progression (Live — truncated at iter 34)</h3>
+            <svg width="100%" viewBox="0 0 540 240" xmlns="http://www.w3.org/2000/svg" style="display:block">
+              <rect x="177.5" y="20" width="120" height="190" fill="#d93025" opacity="0.07"/>
+              <line x1="40" y1="210" x2="510" y2="210" stroke="#e0e0e0"/>
+              <line x1="40" y1="20" x2="40" y2="210"/>
+              <line x1="40" y1="170" x2="510" y2="170" stroke="#e0e0e0" stroke-dasharray="3,3"/>
+              <line x1="40" y1="130" x2="510" y2="130" stroke="#e0e0e0" stroke-dasharray="3,3"/>
+              <line x1="40" y1="90" x2="510" y2="90" stroke="#e0e0e0" stroke-dasharray="3,3"/>
+              <text x="35" y="213" font-size="9" fill="#9aa0a6" text-anchor="end">0.50</text>
+              <text x="35" y="173" font-size="9" fill="#9aa0a6" text-anchor="end">0.55</text>
+              <text x="35" y="133" font-size="9" fill="#9aa0a6" text-anchor="end">0.60</text>
+              <text x="35" y="93" font-size="9" fill="#9aa0a6" text-anchor="end">0.65</text>
+
+              <!-- Individual dots truncated -->
+              <g opacity="0.45" fill="#8ab4f8">
+                <circle cx="40" cy="198" r="3"/><circle cx="56" cy="175" r="3"/><circle cx="72" cy="210" r="3"/>
+                <circle cx="88" cy="148" r="3"/><circle cx="104" cy="156" r="3"/><circle cx="120" cy="133" r="3"/>
+                <circle cx="136" cy="118" r="3"/><circle cx="152" cy="124" r="3"/><circle cx="168" cy="106" r="3"/>
+                <circle cx="184" cy="100" r="3"/><circle cx="200" cy="96" r="3"/>
+                <circle cx="216" cy="119" r="3"/><circle cx="232" cy="130" r="3"/><circle cx="248" cy="114" r="3"/>
+                <circle cx="264" cy="127" r="3"/><circle cx="280" cy="138" r="3"/><circle cx="296" cy="117" r="3"/>
+                <circle cx="312" cy="108" r="3"/><circle cx="328" cy="133" r="3"/><circle cx="344" cy="121" r="3"/>
+                <circle cx="360" cy="140" r="3"/><circle cx="376" cy="128" r="3"/><circle cx="392" cy="146" r="3"/>
+                <circle cx="408" cy="135" r="3"/><circle cx="424" cy="124" r="3"/>
+                <!-- CP2 area -->
+                <circle cx="440" cy="86" r="3"/><circle cx="456" cy="78" r="3"/><circle cx="472" cy="68" r="3"/>
+                <circle cx="488" cy="72" r="3"/>
+              </g>
+              <!-- Best so far -->
+              <polyline points="40,198 56,175 72,175 88,148 104,148 120,133 136,118 152,118 168,106 184,100 200,96 216,96 232,96 248,96 264,96 280,96 296,96 312,96 328,96 344,96 360,96 376,96 392,96 408,96 424,96 440,86 456,78 472,68 488,68" fill="none" stroke="#1a73e8" stroke-width="2.5"/>
+              <!-- Trailing dots "..." -->
+              <circle cx="498" cy="68" r="2" fill="#1a73e8" opacity=".4"/>
+              <circle cx="506" cy="68" r="2" fill="#1a73e8" opacity=".25"/>
+              <text x="510" y="71" font-size="12" fill="#9aa0a6">…</text>
+              <!-- Star at CP2 -->
+              <text x="440" y="81" font-size="12" text-anchor="middle" fill="#34a853">★</text>
+              <!-- X labels -->
+              <text x="40" y="226" font-size="9" fill="#9aa0a6" text-anchor="middle">0</text>
+              <text x="200" y="226" font-size="9" fill="#9aa0a6" text-anchor="middle">10</text>
+              <text x="360" y="226" font-size="9" fill="#9aa0a6" text-anchor="middle">20</text>
+              <text x="488" y="226" font-size="9" fill="#9aa0a6" text-anchor="middle">34</text>
+            </svg>
+          </div>
+
+          <!-- Partial dimension table -->
+          <div class="section-title" style="margin-top:4px;margin-bottom:10px">Dimension Ratings (Preliminary)</div>
+          <table class="dim-table">
+            <thead><tr><th>Dimension</th><th>Rating</th><th>Status</th><th>Note</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Evolutionary Effectiveness</strong></td><td><span class="stars">●●●●<span class="empty">●</span></span></td><td><span class="badge-ok">GOOD</span></td><td style="font-size:11px">+0.206 gain so far</td></tr>
+              <tr><td><strong>Convergence Dynamics</strong></td><td><span class="stars">●●●<span class="empty">●●</span></span></td><td><span class="badge-warn">WARN</span></td><td class="italic-gray">Watching plateau onset</td></tr>
+              <tr><td><strong>Stagnation Detection</strong></td><td><span class="stars">●<span class="empty">●●●●</span></span></td><td><span class="badge-crit">CRITICAL</span></td><td style="font-size:11px">14-iter stagnation in progress</td></tr>
+              <tr><td><strong>Efficiency</strong></td><td><span class="stars">●●<span class="empty">●●●</span></span></td><td><span class="badge-warn">WARN</span></td><td class="italic-gray">— Insufficient data</td></tr>
+              <tr><td><strong>Generalization</strong></td><td colspan="3" class="italic-gray">— Insufficient data (need run completion)</td></tr>
+              <tr><td><strong>Ceiling / Stopping Criteria</strong></td><td colspan="3" class="italic-gray">— Insufficient data (need run completion)</td></tr>
+              <tr><td><strong>Meta-Analysis Quality</strong></td><td colspan="3" class="italic-gray">— Insufficient data (need run completion)</td></tr>
+            </tbody>
+          </table>
+          <div style="margin-top:14px;font-size:12px;color:#9aa0a6;font-style:italic;text-align:center">Full post-mortem report will be generated on run completion.</div>
+        </div>
+
+        <!-- Alert feed sidebar -->
+        <div>
+          <div class="alert-feed">
+            <div class="alert-feed-header">Live Alert Feed</div>
+            <div class="alert-entry">
+              <div class="alert-time">14:32:07 — iter 11</div>
+              <div><span class="badge-crit">CRITICAL</span></div>
+              <div class="alert-msg" style="margin-top:4px">Plateau detected — best score has not improved for 3 consecutive iterations. Monitoring for stagnation.</div>
+            </div>
+            <div class="alert-entry">
+              <div class="alert-time">14:41:22 — iter 19</div>
+              <div><span class="badge-crit">CRITICAL</span></div>
+              <div class="alert-msg" style="margin-top:4px">Stagnation confirmed — 9 non-improving iterations. Mutation strategy locked to diff-only. Recommend manual intervention.</div>
+            </div>
+            <div class="alert-entry" style="background:#fafbff">
+              <div class="alert-time">14:52:48 — iter 34 <span style="color:#1a73e8">● LATEST</span></div>
+              <div><span class="badge-warn">WARNING</span></div>
+              <div class="alert-msg" style="margin-top:4px">Score jumped to 0.718 (breakthrough at iter 25, +0.024). Now in exploitation phase. Monitoring for secondary plateau.
+                <span class="spinner"></span>
+                <span style="color:#9aa0a6;font-size:10px;display:block;margin-top:4px">LLM analysis pending...</span>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:14px;font-size:11px;color:#9aa0a6;padding:0 4px">
+            Alerts refresh automatically every 30 seconds. Critical alerts trigger immediate analysis. Warning alerts are batched every 5 iterations.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+// Panel navigation
+const navLinks = document.querySelectorAll('.nav-link');
+const panels = document.querySelectorAll('.panel');
+const pageTitle = document.getElementById('page-title');
+
+const panelTitles = {
+  'panel-overview': 'Overview',
+  'panel-score': 'Score Progression',
+  'panel-alerts': 'Alert Panel',
+  'panel-budget': 'Failure Budget',
+  'panel-mutation': 'Mutation Effectiveness',
+  'panel-compliance': 'Compliance × Score',
+  'panel-cascade': 'Cascade Stage Distribution',
+  'panel-artifacts': 'Evaluator Artifact Clusters',
+  'panel-efficiency': 'Efficiency Curve',
+  'panel-explore': 'Exploration vs. Exploitation',
+  'panel-inflight': 'In-flight Mode'
+};
+
+navLinks.forEach(link => {
+  link.addEventListener('click', () => {
+    const target = link.getAttribute('data-panel');
+    // Update active nav
+    navLinks.forEach(l => l.classList.remove('active'));
+    link.classList.add('active');
+    // Show/hide panels
+    panels.forEach(p => p.classList.remove('active'));
+    const targetPanel = document.getElementById(target);
+    if (targetPanel) targetPanel.classList.add('active');
+    // Update page title
+    pageTitle.textContent = panelTitles[target] || target;
+  });
+});
+
+// Alert expand/collapse
+function toggleAlert(header) {
+  const body = header.nextElementSibling;
+  const btn = header.querySelector('.expand-btn');
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  btn.textContent = isOpen ? '▼ Expand' : '▲ Collapse';
+}
+</script>
+</body>
+</html>

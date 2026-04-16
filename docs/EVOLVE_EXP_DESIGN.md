@@ -986,7 +986,7 @@ run-evolve-analysis inflight \
 
 ---
 
-## 10. Dashboard (`dashboard.py`)
+## 10. Dashboard (`dashboard.py`) — [mockup](dashboard_mockup.html)
 
 Standalone Streamlit application — not an extension of CLEAR's dashboard. A single `dashboard.py` serves both modes: post-mortem renders a static report; in-flight adds a "run in progress" banner, live auto-refresh (`st.rerun()`), and a real-time alert log panel.
 
